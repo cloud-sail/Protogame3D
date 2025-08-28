@@ -15,6 +15,7 @@ public:
     void RunFrame();
 
     void HandleQuitRequested();
+    void HandleWindowResized();
     bool IsQuitting() const { return m_isQuitting; }
 
 private:

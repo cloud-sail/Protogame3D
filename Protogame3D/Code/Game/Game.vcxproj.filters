@@ -25,10 +25,10 @@
     <ClCompile Include="Entity.cpp">
       <Filter>Gameplay</Filter>
     </ClCompile>
-    <ClCompile Include="Player.cpp">
+    <ClCompile Include="Prop.cpp">
       <Filter>Gameplay</Filter>
     </ClCompile>
-    <ClCompile Include="Prop.cpp">
+    <ClCompile Include="SpectatorCamera.cpp">
       <Filter>Gameplay</Filter>
     </ClCompile>
   </ItemGroup>
@@ -48,10 +48,10 @@
     <ClInclude Include="Entity.hpp">
       <Filter>Gameplay</Filter>
     </ClInclude>
-    <ClInclude Include="Player.hpp">
+    <ClInclude Include="Prop.hpp">
       <Filter>Gameplay</Filter>
     </ClInclude>
-    <ClInclude Include="Prop.hpp">
+    <ClInclude Include="SpectatorCamera.hpp">
       <Filter>Gameplay</Filter>
     </ClInclude>
   </ItemGroup>

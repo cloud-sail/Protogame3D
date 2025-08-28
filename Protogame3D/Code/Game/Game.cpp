@@ -1,8 +1,8 @@
 #include "Game/Game.hpp"
 #include "Game/App.hpp"
 #include "Game/Entity.hpp"
-#include "Game/Player.hpp"
 #include "Game/Prop.hpp"
+#include "Game/SpectatorCamera.hpp"
 #include "Engine/Core/Clock.hpp"
 #include "Engine/Core/DebugRender.hpp"
 #include "Engine/Core/VertexUtils.hpp"
@@ -15,15 +15,131 @@
 #include "Engine/Math/AABB3.hpp"
 #include "Engine/Math/Plane3.hpp"
 #include "Engine/Renderer/SpriteSheet.hpp"
+#include "Engine/Window/Window.hpp"
 
 //-----------------------------------------------------------------------------------------------
 Game::Game()
 {
 	m_clock = new Clock();
 
-	m_player = new Player(this);
-	m_allEntities.push_back(m_player);
+	m_spectator = new SpectatorCamera();
+	m_cursorMode = CursorMode::POINTER;
 
+#pragma region optional
+	InitializeEntities();
+	DebugDrawStartup();
+
+	SkyboxConfig skyboxConfig;
+	skyboxConfig.m_defaultRenderer = g_theRenderer;
+	skyboxConfig.m_fileName = "Data/Images/skybox_desert.png";
+	skyboxConfig.m_type = SkyboxType::CUBE_MAP;
+	m_skybox = new Skybox(skyboxConfig);
+#pragma endregion
+}
+
+Game::~Game()
+{
+	delete m_spectator;
+	m_spectator = nullptr;
+}
+
+void Game::Update()
+{
+#pragma region optional
+	// Attract Mode
+	if (m_isAttractMode)
+	{
+		UpdateAttractMode();
+		m_cursorMode = CursorMode::POINTER;
+		return;
+	}
+#pragma endregion
+
+	// Game Mode
+	UpdateDeveloperCheats();
+	m_spectator->Update();
+	m_cursorMode = CursorMode::FPS;
+
+#pragma region optional
+	UpdateEntities();
+	UpdateCameras();
+	DebugDrawUpdate();
+
+	// return to attract mode
+	XboxController const& controller = g_theInput->GetController(0);
+	if (g_theInput->WasKeyJustPressed(KEYCODE_ESCAPE) || 
+		controller.WasButtonJustPressed(XboxButtonId::XBOX_BUTTON_BACK))
+	{
+		m_isAttractMode = true;
+	}
+#pragma endregion
+}
+
+void Game::Render() const
+{
+#pragma region optional
+	if (m_isAttractMode)
+	{
+		RenderAttractMode();
+		return;
+	}
+#pragma endregion
+
+	// Render World (Spectator Camera, need to be replaced by "Gameplay" camera)
+	g_theRenderer->BeginCamera(m_spectator->m_camera);
+#pragma region optional
+	m_skybox->Render(m_spectator->m_camera);
+	RenderEntities();
+#pragma endregion
+	g_theRenderer->EndCamera(m_spectator->m_camera);
+	DebugRenderWorld(m_spectator->m_camera);
+
+	// Render Screen
+	g_theRenderer->BeginCamera(m_screenCamera);
+	// RenderUI();
+	g_theRenderer->EndCamera(m_screenCamera);
+	DebugRenderScreen(m_screenCamera);
+}
+
+void Game::OnWindowResized()
+{
+	m_spectator->RefreshAspectRatio();
+}
+
+void Game::UpdateDeveloperCheats()
+{
+	if (g_theInput->WasKeyJustPressed(KEYCODE_F1))
+	{
+		g_isDebugDraw = !g_isDebugDraw;
+	}
+
+	bool isSlowMo = g_theInput->IsKeyDown(KEYCODE_T);
+	m_clock->SetTimeScale(isSlowMo ? 0.1 : 1.0);
+
+	if (g_theInput->WasKeyJustPressed(KEYCODE_P))
+	{
+		m_clock->TogglePause();
+	}
+	if (g_theInput->WasKeyJustPressed(KEYCODE_O))
+	{
+		m_clock->StepSingleFrame();
+	}
+	if (g_theInput->WasKeyJustPressed(KEYCODE_F11))
+	{
+		Window::s_mainWindow->ToggleFullscreen();
+	}
+}
+
+void Game::UpdateCameras()
+{
+	// Screen camera (for UI, HUD, Attract, etc.)
+	m_screenCamera.SetOrthographicView(Vec2(0.f, 0.f), Vec2(SCREEN_SIZE_X, SCREEN_SIZE_Y));
+}
+
+#pragma region optional
+
+void Game::InitializeEntities()
+{
 	Prop* cube = new Prop(this);
 	cube->m_position = Vec3(2.f, 2.f, 0.f);
 	cube->m_angularVelocity = EulerAngles(0.f, 30.f, 30.f);
@@ -85,64 +201,6 @@ Game::Game()
 	//Prop* plane = new Prop(this);
 	//AddVertsForGridPlane3D(plane->m_vertexes, Plane3(Vec3::MakeFromPolarDegrees(45.f, 45.f), 1.f));
 	//m_allEntities.push_back(plane);
-
-
-	DebugDrawStartup();
-	//-----------------------------------------------------------------------------------------------
-	SkyboxConfig skyboxConfig;
-	skyboxConfig.m_defaultRenderer = g_theRenderer;
-	skyboxConfig.m_fileName = "Data/Images/skybox_desert.png";
-	skyboxConfig.m_type = SkyboxType::CUBE_MAP;
-	m_skybox = new Skybox(skyboxConfig);
-}
-
-Game::~Game()
-{
-
-}
-
-void Game::Update()
-{
-	if (m_isAttractMode)
-	{
-		UpdateAttractMode();
-		return;
-	}
-
-	XboxController const& controller = g_theInput->GetController(0);
-	if (g_theInput->WasKeyJustPressed(KEYCODE_ESCAPE) || 
-		controller.WasButtonJustPressed(XboxButtonId::XBOX_BUTTON_BACK))
-	{
-		m_isAttractMode = true;
-	}
-	UpdateDeveloperCheats();
-	UpdateEntities();
-	UpdateCameras();
-
-	DebugDrawUpdate();
-}
-
-void Game::Render() const
-{
-	if (m_isAttractMode)
-	{
-		RenderAttractMode();
-		return;
-	}
-
-	// World-space drawing
-	g_theRenderer->BeginCamera(m_player->m_camera);
-	m_skybox->Render(m_player->m_camera);
-
-	RenderEntities();
-	DebugRenderEntities();
-	g_theRenderer->EndCamera(m_player->m_camera);
-	DebugRenderWorld(m_player->m_camera);
-
-	g_theRenderer->BeginCamera(m_screenCamera);
-	RenderUI();
-	g_theRenderer->EndCamera(m_screenCamera);
-	DebugRenderScreen(m_screenCamera);
 }
 
 void Game::UpdateEntities()
@@ -159,7 +217,7 @@ void Game::UpdateEntities()
 	m_shiningCube->m_color = Rgba8(brightness, brightness, brightness);
 
 	Mat44 billBoardTransform = GetBillboardTransform(BillboardType::WORLD_UP_OPPOSING,
-		m_player->GetModelToWorldTransform(),
+		m_spectator->m_camera.GetCameraToWorldTransform(),
 		m_billboard->m_position);
 
 	m_billboard->m_orientation = billBoardTransform.GetEulerAngles();
@@ -178,53 +236,6 @@ void Game::RenderEntities() const
 	}
 	g_theRenderer->EndRenderEvent("Entities");
 }
-
-void Game::DebugRenderEntities() const
-{
-	if (!g_isDebugDraw)
-	{
-		return;
-	}
-}
-
-void Game::RenderUI() const
-{
-}
-
-void Game::UpdateCameras()
-{
-	// Screen camera (for UI, HUD, Attract, etc.)
-	m_screenCamera.SetOrthographicView(Vec2(0.f, 0.f), Vec2(SCREEN_SIZE_X, SCREEN_SIZE_Y));
-}
-
-
-void Game::UpdateDeveloperCheats()
-{
-	AdjustForPauseAndTimeDistortion();
-	if (g_theInput->WasKeyJustPressed(KEYCODE_F1))
-	{
-		g_isDebugDraw = !g_isDebugDraw;
-	}
-}
-
-
-void Game::AdjustForPauseAndTimeDistortion()
-{
-	if (g_theInput->WasKeyJustPressed(KEYCODE_P))
-	{
-		m_clock->TogglePause();
-	}
-
-	if (g_theInput->WasKeyJustPressed(KEYCODE_O))
-	{
-		m_clock->StepSingleFrame();
-	}
-	
-	bool isSlowMo = g_theInput->IsKeyDown(KEYCODE_T);
-
-	m_clock->SetTimeScale(isSlowMo ? 0.1 : 1.0);
-}
-
 
 void Game::UpdateAttractMode()
 {
@@ -280,7 +291,6 @@ void Game::RenderAttractMode() const
 	g_theRenderer->EndCamera(m_screenCamera);
 }
 
-//-----------------------------------------------------------------------------------------------
 void Game::DebugDrawStartup()
 {
 	constexpr float CELL_ASPECT = 0.9f;
@@ -313,10 +323,10 @@ void Game::DebugDrawUpdate()
 	}
 
 	// Current Player Position
-	Vec3 playerPos = m_player->m_position;
+	Vec3 playerPos = m_spectator->m_position;
 	DebugAddMessage(Stringf("Player Position: %.2f, %.2f, %.2f", playerPos.x, playerPos.y, playerPos.z), 0.f);
 
-	EulerAngles playerOrientation = m_player->m_orientation;
+	EulerAngles playerOrientation = m_spectator->m_orientation;
 	Vec3 forward, left, up;
 	playerOrientation.GetAsVectors_IFwd_JLeft_KUp(forward, left, up);
 
@@ -337,7 +347,7 @@ void Game::DebugDrawUpdate()
 
 	if (g_theInput->WasKeyJustPressed('4'))
 	{
-		DebugAddWorldBasis(m_player->GetModelToWorldTransform(), 20.f);
+		DebugAddWorldBasis(m_spectator->m_camera.GetCameraToWorldTransform(), 20.f);
 	}
 
 	if (g_theInput->WasKeyJustPressed('5'))
@@ -380,3 +390,5 @@ void Game::DebugDrawUpdate()
 	//}
 
 }
+
+#pragma endregion

@@ -35,6 +35,12 @@ bool OnQuitEvent(EventArgs& args)
 	return false;
 }
 
+bool OnWindowResized(EventArgs& args)
+{
+	UNUSED(args);
+	g_theApp->HandleWindowResized();
+	return true;
+}
 
 //-----------------------------------------------------------------------------------------------
 App::App()
@@ -102,7 +108,7 @@ void App::Startup()
 
 	// Initialize game-related stuff: create and start the game
 	g_theEventSystem->SubscribeEventCallbackFunction("Quit", OnQuitEvent);
-	//Clock::TickSystemClock(); // timer created before system clock tick will not start correctly
+	g_theEventSystem->SubscribeEventCallbackFunction(WINDOW_RESIZE_EVENT, OnWindowResized);
 	g_theGame = new Game();
 
 	g_theDevConsole->AddText(DevConsole::INFO_MAJOR, "Controls");
@@ -179,7 +185,7 @@ void App::RunFrame()
 	Clock::TickSystemClock();
 
 	BeginFrame();			// Engine pre-frame stuff
-	Update();	// Game updates / moves/ spawns / hurts/ kills stuffs
+	Update();				// Game updates / moves / spawns / hurts / kills stuffs
 	Render();				// Game draws current state of things
 	EndFrame();				// Engine post-frame stuff
 }
@@ -187,6 +193,11 @@ void App::RunFrame()
 void App::HandleQuitRequested()
 {
 	m_isQuitting = true;
+}
+
+void App::HandleWindowResized()
+{
+	g_theGame->OnWindowResized();
 }
 
 void App::BeginFrame()
@@ -202,18 +213,20 @@ void App::BeginFrame()
 
 void App::Update()
 {
+	// F8 - Reset the Game
 	if (g_theInput->WasKeyJustPressed(KEYCODE_F8))
 	{
 		delete g_theGame;
 		g_theGame = new Game();
 	}
-	if (!g_theWindow->IsFocused() || g_theDevConsole->GetMode() != DevConsoleMode::HIDDEN || g_theGame->m_isAttractMode)
+
+	if (!g_theWindow->IsFocused() || g_theDevConsole->GetMode() != DevConsoleMode::HIDDEN)
 	{
 		g_theInput->SetCursorMode(CursorMode::POINTER);
 	}
 	else
 	{
-		g_theInput->SetCursorMode(CursorMode::FPS);
+		g_theInput->SetCursorMode(g_theGame->GetCursorMode());
 	}
 
 	g_theGame->Update();
@@ -231,8 +244,6 @@ void App::Render() const
 	g_theRenderer->BeginCamera(devConsoleCamera);
 	g_theDevConsole->Render(bounds);
 	g_theRenderer->EndCamera(devConsoleCamera);
-
-
 }
 
 void App::EndFrame()

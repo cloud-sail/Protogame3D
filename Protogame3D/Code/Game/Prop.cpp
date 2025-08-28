@@ -36,7 +36,6 @@ void Prop::Render() const
 
 	g_theRenderer->BindShader(nullptr);
 	g_theRenderer->SetBlendMode(BlendMode::ALPHA);
-	//g_theRenderer->SetRasterizerMode(RasterizerMode::WIREFRAME_CULL_NONE);
 	g_theRenderer->SetRasterizerMode(RasterizerMode::SOLID_CULL_BACK);
 	g_theRenderer->SetDepthMode(DepthMode::READ_WRITE_LESS_EQUAL);
 	g_theRenderer->SetRenderTargetFormats();
